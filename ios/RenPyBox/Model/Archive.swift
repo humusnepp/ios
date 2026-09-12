@@ -69,7 +69,7 @@ struct Archive {
                 stream.pointee.dst_ptr = dstBuf
                 stream.pointee.dst_size = bufSize
 
-                let status = compression_stream_process(stream, finalize)
+                let status = compression_stream_process(stream, Int32(finalize.rawValue))
                 if status == COMPRESSION_STATUS_ERROR { return nil }
 
                 let produced = bufSize - stream.pointee.dst_size
