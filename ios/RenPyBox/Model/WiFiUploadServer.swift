@@ -31,11 +31,11 @@ final class WiFiUploadServer: NSObject {
     func start() {
         guard listener == nil else { return }
 
-        let params = NWParameters(tcp: NWProtocolTCP.Options())
+        let params = NWParameters(tls: nil, tcp: NWProtocolTCP.Options())
         params.allowLocalEndpointReuse = true
         params.includePeerToPeer = true
         let serviceName = UIDevice.current.name.isEmpty ? "RenPy Box" : "RenPy Box on \(UIDevice.current.name)"
-        params.service = NWListener.Service(type: "_renpybox._tcp", domain: "local.", name: serviceName)
+        params.service = NWListener.Service(name: serviceName, domain: "local.", type: "_renpybox._tcp")
 
         let newListener = try? NWListener(using: params, on: 9180)
         guard let listener = newListener, listener.port != nil else {
@@ -93,7 +93,7 @@ final class WiFiUploadServer: NSObject {
         var path = "/"
 
         func pump() {
-            connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
+            connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, isComplete, error in
                 guard let self else {
                     connection.cancel()
                     return
@@ -208,8 +208,7 @@ final class WiFiUploadServer: NSObject {
         }
 
         do {
-            var progress = 0.0
-            let game = try GameImporter.importSource(at: target) { p in progress = p }
+            let game = try GameImporter.importSource(at: target) { _ in }
             try? fm.removeItem(at: target)
             let store = RenPyBoxGameLauncher.store
             DispatchQueue.main.async { store.refresh() }

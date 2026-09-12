@@ -31,48 +31,57 @@ enum ArchiveError: LocalizedError {
 struct Archive {
     /// Raw DEFLATE inflate (used by both ZIP and GZIP payloads).
     static func inflate(_ data: Data) -> Data? {
-        var stream = compression_stream()
-        guard compression_stream_init(&stream, COMPRESSION_STREAM_DECODE, COMPRESSION_ZLIB) == COMPRESSION_STATUS_OK else {
-            return nil
-        }
-        defer { compression_stream_destroy(&stream) }
-
         let bytes = [UInt8](data)
         let bufSize = 1 << 16
+
+        let stream = UnsafeMutablePointer<compression_stream>.allocate(capacity: 1)
+        defer { stream.deallocate() }
+
+        guard compression_stream_init(stream, COMPRESSION_STREAM_DECODE, COMPRESSION_ZLIB) == COMPRESSION_STATUS_OK else {
+            return nil
+        }
+        defer { compression_stream_destroy(stream) }
+
+        let srcBuf = UnsafeMutablePointer<UInt8>.allocate(capacity: bufSize)
+        let dstBuf = UnsafeMutablePointer<UInt8>.allocate(capacity: bufSize)
+        defer { srcBuf.deallocate(); dstBuf.deallocate() }
+
         var out = Data(capacity: bytes.count * 2)
         var offset = 0
-
-        var srcBuf = [UInt8](repeating: 0, count: bufSize)
-        var dstBuf = [UInt8](repeating: 0, count: bufSize)
 
         while true {
             let toRead = min(bufSize, bytes.count - offset)
             if toRead > 0 {
-                srcBuf.withUnsafeMutableBytes { sp in
-                    sp.copyBytes(from: bytes[offset..<offset + toRead])
+                bytes.withUnsafeBufferPointer { bp in
+                    if let base = bp.baseAddress {
+                        srcBuf.update(from: base, count: toRead)
+                    }
                 }
             }
             offset += toRead
-            let finalize: Int32 = (offset == bytes.count) ? COMPRESSION_STREAM_FINALIZE : 0
+            let finalize = (offset >= bytes.count) ? COMPRESSION_STREAM_FINALIZE : compression_stream_flags()
 
-            stream.src_ptr = srcBuf.withUnsafeMutableBytes { $0.bindMemory(to: UInt8.self).baseAddress }
-            stream.src_size = toRead
+            stream.pointee.src_ptr = srcBuf
+            stream.pointee.src_size = toRead
 
             var done = false
             repeat {
-                stream.dst_ptr = dstBuf.withUnsafeMutableBytes { $0.bindMemory(to: UInt8.self).baseAddress }
-                stream.dst_size = dstBuf.count
+                stream.pointee.dst_ptr = dstBuf
+                stream.pointee.dst_size = bufSize
 
-                let status = compression_stream_process(&stream, finalize)
+                let status = compression_stream_process(stream, finalize)
                 if status == COMPRESSION_STATUS_ERROR { return nil }
 
-                let produced = dstBuf.count - stream.dst_size
+                let produced = bufSize - stream.pointee.dst_size
                 if produced > 0 { out.append(dstBuf, count: produced) }
 
                 if status == COMPRESSION_STATUS_END { done = true; break }
-                if status == COMPRESSION_STATUS_OK && stream.dst_size > 0 { break }
-                if status == COMPRESSION_STATUS_OK && produced == 0 && toRead == 0 { done = true; break }
-            } while stream.dst_size == 0
+                if status == COMPRESSION_STATUS_OK && stream.pointee.dst_size > 0 { break }
+                if status == COMPRESSION_STATUS_OK && produced == 0 && toRead == 0 {
+                    done = true
+                    break
+                }
+            } while stream.pointee.dst_size == 0
 
             if done { break }
             if toRead == 0 { break }
@@ -223,7 +232,7 @@ struct Archive {
 
         var header = [UInt8](repeating: 0, count: 512)
         var position: UInt64 = 0
-        let total = fm.attributesOfItem(atPath: url.path)[.size] as? UInt64 ?? 0
+        let total = (try? fm.attributesOfItem(atPath: url.path)[.size] as? UInt64) ?? 0
 
         while true {
             guard position + 512 <= total else { break }

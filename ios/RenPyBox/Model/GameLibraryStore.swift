@@ -39,15 +39,17 @@ final class GameLibraryStore: ObservableObject {
         games = found.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
-    func install(archiveURL: URL, progress: (Double) -> Void = { _ in }) throws -> RenPyGame {
+    func install(archiveURL: URL, progress: @escaping (Double) -> Void = { _ in }) throws -> RenPyGame {
         let game = try GameImporter.importSource(at: archiveURL, progress: progress)
-        refresh()
+        DispatchQueue.main.async { self.refresh() }
         return game
     }
 
     func remove(_ game: RenPyGame) {
         try? FileManager.default.removeItem(at: game.directory)
-        try? FileManager.default.removeItem(at: coverFile(for: game))
+        if let cover = coverFile(for: game) {
+            try? FileManager.default.removeItem(at: cover)
+        }
         refresh()
     }
 

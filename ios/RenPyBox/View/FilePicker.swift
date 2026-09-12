@@ -17,7 +17,7 @@ struct FilePickerView: UIViewControllerRepresentable {
     }
 
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        let types = [UTType.zip, UTType.tar, UTType.gzip, UTType.data, UTType.folder]
+        let types = [UTType.zip, UTType.gzip, UTType.data, UTType.folder]
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: true)
         picker.allowsMultipleSelection = true
         picker.delegate = context.coordinator

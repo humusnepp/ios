@@ -18,7 +18,7 @@ private func launcher_main(_ argc: Int32, _ argv: UnsafeMutablePointer<UnsafeMut
 @objcMembers
 public final class RenPyBoxGameLauncher: NSObject {
 
-    public static let store = GameLibraryStore()
+    static let store = GameLibraryStore()
 
     private static var gameRunning = false
     private static var hosting: UIViewController?
@@ -37,7 +37,7 @@ public final class RenPyBoxGameLauncher: NSObject {
         let root = RenPyBoxRootView().environmentObject(store)
         let controller = UIHostingController(rootView: root)
         controller.modalPresentationStyle = .fullScreen
-        controller.modalInPresentation = true
+        controller.isModalInPresentation = true
         hosting = controller
 
         guard let base = keyWindow()?.rootViewController else { return }

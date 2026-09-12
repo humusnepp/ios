@@ -121,7 +121,6 @@ struct LibraryView: View {
         } label: {
             VStack(alignment: .leading, spacing: 8) {
                 cover(for: game)
-                    .resizable()
                     .aspectRatio(16 / 9, contentMode: .fit)
                     .frame(maxWidth: .infinity)
                     .background(Color.black.opacity(0.3))
@@ -168,6 +167,8 @@ struct LibraryView: View {
     private func cover(for game: RenPyGame) -> some View {
         if let img = store.cover(for: game) {
             Image(uiImage: img)
+                .resizable()
+                .scaledToFill()
         } else {
             ZStack {
                 Rectangle().fill(.quinary)

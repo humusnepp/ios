@@ -124,7 +124,7 @@ struct GameImporter {
         // Find the line(s) that define config.name, then grab the quoted value.
         for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
             let line = String(line)
-            guard line.contains("config.name") || line.contains("config\.name.match") else { continue }
+            guard line.contains("config.name") else { continue }
             guard let quoteStart = firstQuoteIndex(in: line) else { continue }
             var result = String.UnicodeScalarView()
             for sc in line.unicodeScalars.dropFirst(quoteStart.1 + 1) {
@@ -152,10 +152,10 @@ struct GameImporter {
 
     private static func sanitize(_ s: String) -> String {
         var out = ""
-        for ch in s.unicodeScalars {
-            if ch.isASCII && ch.properties.isAlphabetic || ch.properties.isNumber || ch == "-" || ch == "_" || ch == " " {
-                out.append(Character(ch))
-            }
+        for sc in s.unicodeScalars {
+            let c = Character(String(sc))
+            let keep = (sc.isASCII && (c.isLetter || c.isNumber)) || sc == "-" || sc == "_" || sc == " "
+            if keep { out.append(c) }
         }
         out = out.trimmingCharacters(in: .whitespaces)
         return out.isEmpty ? "Game" : out.replacingOccurrences(of: " ", with: "_")
