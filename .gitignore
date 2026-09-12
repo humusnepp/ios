@@ -1,0 +1,24 @@
+# Build & download artifacts
+build/
+*.ipa
+*.app
+*.zip
+*.dmg
+*.7z*
+*.tar.bz2
+
+# Inspected DLC copy (only needed offline for reference)
+.inspect_renios/
+renios-*.zip
+
+# Xcode
+*.xcworkspace/
+xcuserdata/
+*.xcodeproj/xcuserdata/
+DerivedData/
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

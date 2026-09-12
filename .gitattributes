@@ -1,0 +1,5 @@
+* text=auto
+*.sh text eol=lf
+scripts/ci-build.sh text eol=lf
+.github/workflows/*.yml text eol=lf
+ios/project.yml text eol=lf
