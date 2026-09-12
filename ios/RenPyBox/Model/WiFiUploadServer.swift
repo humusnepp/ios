@@ -34,8 +34,6 @@ final class WiFiUploadServer: NSObject {
         let params = NWParameters(tls: nil, tcp: NWProtocolTCP.Options())
         params.allowLocalEndpointReuse = true
         params.includePeerToPeer = true
-        let serviceName = UIDevice.current.name.isEmpty ? "RenPy Box" : "RenPy Box on \(UIDevice.current.name)"
-        params.service = NWListener.Service(name: serviceName, domain: "local.", type: "_renpybox._tcp")
 
         let newListener = try? NWListener(using: params, on: 9180)
         guard let listener = newListener, listener.port != nil else {
@@ -93,7 +91,7 @@ final class WiFiUploadServer: NSObject {
         var path = "/"
 
         func pump() {
-            connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, isComplete, error in
+            connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
                 guard let self else {
                     connection.cancel()
                     return

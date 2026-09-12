@@ -59,9 +59,9 @@ struct Archive {
                 }
             }
             offset += toRead
-            let finalize = (offset >= bytes.count) ? COMPRESSION_STREAM_FINALIZE : compression_stream_flags()
+            let finalize = (offset >= bytes.count) ? COMPRESSION_STREAM_FINALIZE : compression_stream_flags(0)
 
-            stream.pointee.src_ptr = srcBuf
+            stream.pointee.src_ptr = UnsafePointer(srcBuf)
             stream.pointee.src_size = toRead
 
             var done = false
