@@ -55,7 +55,7 @@ targets:
           - "@executable_path/Frameworks"
         LIBRARY_SEARCH_PATHS:
           - "$(inherited)"
-          - "$(PROJECT_DIR)/prebuilt"
+          - "$(PROJECT_DIR)/prebuilt/release"
         OTHER_LDFLAGS:
           - "-lrenpython"
           - "-lrenpy"
