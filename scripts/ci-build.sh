@@ -172,7 +172,7 @@ cp -R "${IOSOUT}/prebuilt/release" "${STAGE}/prebuilt"
 cp -R "${IOSOUT}/Frameworks"/* "${STAGE}/Frameworks/"
 for f in "Launch Screen.storyboard" Media.xcassets LaunchImage-background.png \
          LaunchImage-foreground.png Log.m IAPHelper.m VideoPlayer.m; do
-  cp "${IOSOUT}/${f}" "${STAGE}/engine/" 2>/dev/null || warn "missing engine file: ${f}"
+  cp -R "${IOSOUT}/${f}" "${STAGE}/engine/" 2>/dev/null || warn "missing engine file: ${f}"
 done
 
 # ---------------------------------------------------------------------------
