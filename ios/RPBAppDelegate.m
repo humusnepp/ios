@@ -11,6 +11,7 @@
 #import "RenPyBox-Swift.h"
 
 @interface RPBAppDelegate : UIResponder <UIApplicationDelegate>
+@property (nonatomic, strong) UIWindow *window;
 @end
 
 @implementation RPBAppDelegate
@@ -18,15 +19,20 @@
 - (BOOL)application:(UIApplication *)application
     didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
 
-    [RenPyBoxBoot mark:@"RPBAppDelegate didFinishLaunching"];
+    @try {
+        [RenPyBoxBoot mark:@"RPBAppDelegate didFinishLaunching"];
 
-    UIViewController *library = [RenPyBoxGameLauncher libraryRootController];
-    UIWindow *window = [[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds];
-    window.rootViewController = library;
-    self.window = window;
-    [window makeKeyAndVisible];
+        UIViewController *library = [RenPyBoxGameLauncher libraryRootController];
+        UIWindow *window = [[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds];
+        window.rootViewController = library;
+        self.window = window;
+        [window makeKeyAndVisible];
 
-    [RenPyBoxBoot mark:@"library attached as window root"];
+        [RenPyBoxBoot mark:@"library attached as window root"];
+    } @catch (NSException *exception) {
+        [RenPyBoxBoot mark:[NSString stringWithFormat:@"EXCEPTION: %@", exception]];
+        return NO;
+    }
     return YES;
 }
 
