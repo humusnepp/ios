@@ -39,6 +39,28 @@ final class GameLibraryStore: ObservableObject {
         games = found.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
+    /// Copies the bundled "TestGame" (Ren'Py's stock sample) into the library
+    /// on first launch so there is always something to play out of the box.
+    func ensureTestGameSeeded() {
+        let fm = FileManager.default
+        let bundled = Bundle.main.url(forResource: "TestGame", withExtension: nil)
+            ?? Bundle.main.bundleURL.appendingPathComponent("TestGame", isDirectory: true)
+        let target = GamePaths.storiesDirectory.appendingPathComponent("the_question", isDirectory: true)
+        guard !fm.fileExists(atPath: target.path) else { return }
+        guard fm.fileExists(atPath: bundled.path) else {
+            RenPyBoxGameLauncher.libraryLog("TestGame bundle missing")
+            return
+        }
+        try? fm.createDirectory(at: GamePaths.storiesDirectory, withIntermediateDirectories: true)
+        do {
+            try fm.copyItem(at: bundled, to: target)
+            RenPyBoxGameLauncher.libraryLog("seeded test game from bundle")
+        } catch {
+            RenPyBoxGameLauncher.libraryLog("seed failed: \(error)")
+        }
+        refresh()
+    }
+
     func install(archiveURL: URL, progress: @escaping (Double) -> Void = { _ in }) throws -> RenPyGame {
         let game = try GameImporter.importSource(at: archiveURL, progress: progress)
         DispatchQueue.main.async { self.refresh() }

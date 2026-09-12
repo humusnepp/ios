@@ -185,6 +185,13 @@ cp "${ROOT}/ios/PlayerMain.m" "${STAGE}/PlayerMain.m"
 cp "${ROOT}/ios/Info.plist"   "${STAGE}/Info.plist"
 sed "s|__BUNDLE_ID__|${BUNDLE_ID}|" "${ROOT}/ios/project.yml" > "${STAGE}/project.yml"
 
+log "Bundling test game (SDK sample the_question)..."
+if [ -d "${SDK}/the_question" ]; then
+  cp -R "${SDK}/the_question" "${STAGE}/TestGame"
+else
+  warn "SDK sample the_question not found; skipping test-game bundling"
+fi
+
 log "Generating Xcode project..."
 cd "${STAGE}"
 xcodegen generate

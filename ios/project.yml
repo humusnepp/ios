@@ -34,6 +34,8 @@ targets:
       - path: engine/Media.xcassets
       - path: base
         type: folder
+      - path: TestGame
+        type: folder
 
     info:
       path: Info.plist
