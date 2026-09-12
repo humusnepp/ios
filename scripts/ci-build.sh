@@ -128,18 +128,12 @@ BASE_SRC="${IOSOUT}/base"
 test -d "${BASE_SRC}" || { echo "base/ missing in ${IOSOUT}"; exit 1; }
 
 # ---------------------------------------------------------------------------
-# 3. Post-process base/
+# 3. Patch the generated project's base/main.py (per-game launch config stays
+#    future-proof; harmless when a single game is baked in)
 # ---------------------------------------------------------------------------
-log "Preparing app base/ ..."
-rm -rf "${STAGE}"
-mkdir -p "${STAGE}/base"
+BASE_SRC="${IOSOUT}/base"
+test -d "${BASE_SRC}" || { echo "base/ missing in ${IOSOUT}"; exit 1; }
 
-# Copy engine + stdlib; drop the placeholder game payload (games live under
-# Documents/stories/<Game> and are selected at runtime via positional basedir).
-rsync -a --exclude 'game/' --exclude '__pycache__' "${BASE_SRC}/" "${STAGE}/base/"
-
-# Patch base/main.py: allow per-game language selection written by the app
-# into <game dir>/.renpybox.lang. Prepended before the engine's own bootstrap.
 LANG_PATCH=$(cat <<'PY'
 # --- RenPy Box: per-game launch config ---
 import os as _rpb_os
@@ -158,7 +152,7 @@ if _rpb_dir:
 PY
 )
 
-MAIN_PY="${STAGE}/base/main.py"
+MAIN_PY="${BASE_SRC}/main.py"
 if [ -f "${MAIN_PY}" ]; then
   printf '%s' "${LANG_PATCH}" | cat - "${MAIN_PY}" > "${MAIN_PY}.new"
   mv "${MAIN_PY}.new" "${MAIN_PY}"
@@ -166,54 +160,39 @@ else
   warn "base/main.py missing - expected at ${MAIN_PY}"
 fi
 
-log "Staging engine files..."
-mkdir -p "${STAGE}/prebuilt" "${STAGE}/Frameworks" "${STAGE}/engine"
-cp -R "${IOSOUT}/prebuilt/release" "${STAGE}/prebuilt"
-cp -R "${IOSOUT}/Frameworks"/* "${STAGE}/Frameworks/"
-for f in "Launch Screen.storyboard" Media.xcassets LaunchImage-background.png \
-         LaunchImage-foreground.png Log.m IAPHelper.m VideoPlayer.m; do
-  cp -R "${IOSOUT}/${f}" "${STAGE}/engine/" 2>/dev/null || warn "missing engine file: ${f}"
-done
-
 # ---------------------------------------------------------------------------
-# 4. Stage our app sources + generate Xcode project with XcodeGen
+# 4. Build the renios-generated reference project (NO hand-rolled linking).
+#    This is the exact pipeline renios ships with: the sample game (baked in
+#    by ios_create) plays as soon as the app boots.
 # ---------------------------------------------------------------------------
-log "Staging app sources..."
-cp -R "${ROOT}/ios/RenPyBox" "${STAGE}/RenPyBox"
-cp "${ROOT}/ios/main.c"       "${STAGE}/main.c"
-cp "${ROOT}/ios/PlayerMain.m" "${STAGE}/PlayerMain.m"
-cp "${ROOT}/ios/Info.plist"   "${STAGE}/Info.plist"
-sed "s|__BUNDLE_ID__|${BUNDLE_ID}|" "${ROOT}/ios/project.yml" > "${STAGE}/project.yml"
+PROJ="$(find "${IOSOUT}" -maxdepth 3 -name '*.xcodeproj' | head -n 1)"
+test -n "${PROJ}" || { echo "No .xcodeproj in ${IOSOUT}"; exit 1; }
+log "Using generated project: ${PROJ}"
 
-log "Bundling test game (SDK sample the_question)..."
-if [ -d "${SDK}/the_question" ]; then
-  cp -R "${SDK}/the_question" "${STAGE}/TestGame"
-else
-  warn "SDK sample the_question not found; skipping test-game bundling"
-fi
+TARGET="$(xcodebuild -list -project "${PROJ}" 2>/dev/null | awk '/Targets:/{f=1;next} /Build Configurations:/{f=0} f && NF{print $1; exit}')"
+test -n "${TARGET}" || { echo "No target found in ${PROJ}"; exit 1; }
+log "Build target: ${TARGET}"
 
-log "Generating Xcode project..."
-cd "${STAGE}"
-xcodegen generate
-
-# ---------------------------------------------------------------------------
-# 5. Build (unsigned) + package IPA
-# ---------------------------------------------------------------------------
-log "Building (no code signing)..."
+log "Building unsigned IPA (reference renios project)..."
+rm -rf "${BUILD}/dd"
 xcodebuild \
-  -project RenPyBox.xcodeproj \
-  -scheme RenPyBox \
+  -project "${PROJ}" \
+  -target "${TARGET}" \
   -configuration Release \
   -destination 'generic/platform=iOS' \
-  -derivedDataPath "${STAGE}/dd" \
+  -derivedDataPath "${BUILD}/dd" \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO \
   CODE_SIGN_IDENTITY="" \
   build
 
-APP="${STAGE}/dd/Build/Products/Release-iphoneos/RenPyBox.app"
-test -d "${APP}" || { echo "RenPyBox.app not found"; exit 1; }
+APP="$(find "${BUILD}/dd/Build/Products/Release-iphoneos" -maxdepth 1 -name '*.app' | head -n 1)"
+test -d "${APP}" || { echo "'${APP}' not found"; exit 1; }
+log "Built app: ${APP}"
 
+# ---------------------------------------------------------------------------
+# 5. Package IPA
+# ---------------------------------------------------------------------------
 log "Packaging IPA..."
 rm -rf "${BUILD}/payload" "${DIST}/RenPyBox.ipa"
 mkdir -p "${BUILD}/payload/Payload"
