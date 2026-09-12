@@ -15,8 +15,9 @@ extern int launcher_main(int argc, char **argv);
 
 int player_main(int argc, char **argv) {
     @autoreleasepool {
-        // After a game quits, launcher_main returns and Swift re-presents the
-        // library itself - nothing else to do here.
+        // First milestone drawn on screen BEFORE any Swift code runs, proving
+        // the SDL -> player_main -> Swift bridge is alive.
+        [RenPyBoxBoot mark:@"player_main entered"];
         [RenPyBoxGameLauncher startApp];
     }
     return 0;

@@ -14,7 +14,7 @@ import SwiftUI
 private func launcher_main(_ argc: Int32, _ argv: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>!) -> Int32
 
 /// Entry point for the whole player. Called by `player_main` (in PlayerMain.m)
-    /// on SDL's background startup thread after the SDL/UIKit app has launched.
+/// on SDL's background startup thread after the SDL/UIKit app has launched.
 @objcMembers
 public final class RenPyBoxGameLauncher: NSObject {
 
@@ -22,57 +22,48 @@ public final class RenPyBoxGameLauncher: NSObject {
 
     private static var gameRunning = false
     private static var hosting: UIViewController?
+    private static var sdlRoot: UIViewController?
 
     /// Called when the app finishes launching. Shows the library.
     @objc public static func startApp() {
         DispatchQueue.main.async {
-            libraryLog("APP START -> presenting library")
+            RenPyBoxBoot.showBootInfo()
+            RenPyBoxBoot.mark("boot: startApp on main queue")
             presentLibrary()
         }
     }
 
-    /// Presents the SwiftUI root inside SDL's UIKit window.
+    /// Presents the SwiftUI library by swapping it in as the window's root
+    /// view controller (SDL's original root is stashed and restored when a
+    /// game launches). This can't silently fail like a modal presentation.
     @objc public static func presentLibrary() {
-        guard !gameRunning else { return }
+        guard !gameRunning else {
+            RenPyBoxBoot.mark("presentLibrary skipped: game running")
+            return
+        }
 
         store.ensureTestGameSeeded()
+        RenPyBoxBoot.mark("presentLibrary: library games=\(store.games.count)")
 
-        let root = RenPyBoxRootView().environmentObject(store)
-        let controller = UIHostingController(rootView: root)
-        controller.modalPresentationStyle = .fullScreen
-        controller.isModalInPresentation = true
-        hosting = controller
-        tryPresent(attempts: 0)
-    }
+        let controller = hosting ?? {
+            let c = UIHostingController(rootView: RenPyBoxRootView().environmentObject(store))
+            hosting = c
+            return c
+        }()
 
-    private static func tryPresent(attempts: Int) {
-        guard let base = keyWindow()?.rootViewController else {
-            libraryLog("no root view controller yet (attempt \(attempts)); retrying")
-            if attempts < 20 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { tryPresent(attempts: attempts + 1) }
-            } else if let window = keyWindow() {
-                libraryLog("modal failed; attaching library as window root")
-                hosting?.view.frame = window.bounds
-                window.rootViewController = hosting
-            } else {
-                libraryLog("GAVE UP: no UIWindow available")
-            }
+        guard let window = keyWindow() else {
+            RenPyBoxBoot.mark("presentLibrary: NO WINDOW - retrying in 0.5s")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { presentLibrary() }
             return
         }
-        if let h = hosting, h.view.window != nil {
-            libraryLog("library already on screen")
-            return
-        }
-        guard let h = hosting else {
-            libraryLog("hosting lost")
-            return
-        }
-        libraryLog("presenting library over root \(type(of: base))")
-        base.present(h, animated: false) {
-            libraryLog("library presented: onScreen=\(h.view.window != nil)")
-            if h.view.window == nil {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { tryPresent(attempts: attempts + 1) }
-            }
+
+        if window.rootViewController !== controller {
+            sdlRoot = window.rootViewController
+            controller.view.frame = window.bounds
+            window.rootViewController = controller
+            RenPyBoxBoot.mark("library attached as window root (prev=\(sdlRoot.map { String(describing: type(of: $0)) } ?? "nil"))")
+        } else {
+            RenPyBoxBoot.mark("library already attached")
         }
     }
 
@@ -81,12 +72,12 @@ public final class RenPyBoxGameLauncher: NSObject {
     @objc public static func launchGame(gameDir: String) -> Int32 {
         guard !gameRunning else { return -1 }
         gameRunning = true
-        libraryLog("launching game at \(gameDir)")
+        RenPyBoxBoot.mark("launch game: \(gameDir)")
 
-        // Tear down the SwiftUI library sheet before Ren'Py takes the screen.
-        if let hosting = hosting {
-            hosting.dismiss(animated: false)
-            self.hosting = nil
+        // Put SDL's view controller back so Ren'Py renders into its window.
+        if let window = keyWindow(), let sdl = sdlRoot {
+            window.rootViewController = sdl
+            RenPyBoxBoot.mark("library detached, SDL root restored")
         }
 
         setenv("RENPYBOX_GAME_DIR", gameDir, 1)
@@ -105,32 +96,25 @@ public final class RenPyBoxGameLauncher: NSObject {
         }
 
         gameRunning = false
-        libraryLog("launcher_main returned \(result)")
+        RenPyBoxBoot.mark("launcher_main returned \(result)")
         DispatchQueue.main.async {
             presentLibrary()
         }
         return result
     }
 
-    private static func keyWindow() -> UIWindow? {
-        let windows = UIApplication.shared.connectedScenes
-            .compactMap { ($0 as? UIWindowScene)?.windows }
-            .flatMap { $0 }
-        return windows.first(where: { $0.isKeyWindow }) ?? windows.first
+    /// Covered by RenPyBoxBoot.mark.
+    static func libraryLog(_ s: String) {
+        RenPyBoxBoot.mark(s)
     }
 
-    static func libraryLog(_ s: String) {
-        NSLog("[RenPyBox] %@", s)
-        let url = GamePaths.documentsDirectory.appendingPathComponent("renpybox.log", isDirectory: false)
-        let line = "[\(Date())] \(s)\n"
-        if let h = try? FileHandle(forWritingTo: url) {
-            do {
-                h.seekToEndOfFile()
-                try h.write(contentsOf: line.data(using: .utf8) ?? Data())
-                try? h.close()
-            } catch {}
-        } else {
-            try? line.data(using: .utf8)?.write(to: url)
+    private static func keyWindow() -> UIWindow? {
+        if let w = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) ?? UIApplication.shared.windows.first {
+            return w
         }
+        return UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.windows }
+            .flatMap { $0 }
+            .first
     }
 }
