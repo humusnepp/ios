@@ -23,8 +23,8 @@ targets:
 
     sources:
       - path: RenPyBox
-      - path: main.c
-      - path: PlayerMain.m
+      - path: main.m
+      - path: RPBAppDelegate.m
       - path: engine/Log.m
       - path: engine/IAPHelper.m
       - path: engine/VideoPlayer.m
