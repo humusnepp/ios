@@ -75,15 +75,24 @@ cp -R "${RENIOS}/renios" "${SDK}/renios"
 # 2. Create the Xcode project with the launcher, populate base/
 # ---------------------------------------------------------------------------
 if [ ! -d "${IOSOUT}" ]; then
-  log "Creating placeholder project from SDK template..."
+  log "Creating placeholder project from SDK sample (the_question)..."
   rm -rf "${PLACEHOLDER}"
-  cp -R "${SDK}/template" "${PLACEHOLDER}"
+  cp -R "${SDK}/the_question" "${PLACEHOLDER}"
 
   # ios_populate regenerates the app icon from <project>/ios-icon.png.
-  # If missing, synthesize one from the template's main menu art.
+  # The sample ships gui images, so synthesize one from its main menu art.
   if [ ! -f "${PLACEHOLDER}/ios-icon.png" ]; then
-    sips -z 1024 1024 "${PLACEHOLDER}/gui/main_menu.png" \
-      --out "${PLACEHOLDER}/ios-icon.png" >/dev/null 2>&1 || true
+    MENU_IMG="$(find "${PLACEHOLDER}/game" -iname 'main_menu.png' | head -n1)"
+    if [ -z "${MENU_IMG}" ]; then
+      MENU_IMG="$(find "${PLACEHOLDER}/game" -iname '*.png' | head -n1)"
+    fi
+    if [ -n "${MENU_IMG}" ]; then
+      cp "${MENU_IMG}" "${PLACEHOLDER}/ios-icon.png"
+      sips --resampleWidth 1024 "${PLACEHOLDER}/ios-icon.png" >/dev/null 2>&1 || true
+      sips --setProperty format png "${PLACEHOLDER}/ios-icon.png" >/dev/null 2>&1 || true
+    else
+      warn "No sample image found to synthesize ios-icon.png; ios_create may fail."
+    fi
   fi
 
   log "Running launcher ios_create (headless)..."
@@ -95,8 +104,14 @@ if [ ! -d "${IOSOUT}" ]; then
       :
     else
       # Fallback: invoke the SDK python directly against the launcher.
-      PY="${SDK}/lib/py3-mac-`uname -m`/renpython"
-      if [ -x "${PY}" ]; then
+      PY=""
+      for cand in \
+          "${SDK}/lib/py3-mac-`uname -m`/renpython" \
+          "${SDK}/lib/py3-mac-universal2/renpython" \
+          "${SDK}/lib/py3-mac-x86_64/renpython"; do
+        if [ -x "${cand}" ]; then PY="${cand}"; break; fi
+      done
+      if [ -n "${PY}" ]; then
         "${PY}" launcher ios_create "${PLACEHOLDER}" "${IOSOUT}" \
           >> "${BUILD}/ios_create.log" 2>&1
       else
