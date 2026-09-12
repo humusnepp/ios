@@ -169,7 +169,7 @@ PROJ="$(find "${IOSOUT}" -maxdepth 3 -name '*.xcodeproj' | head -n 1)"
 test -n "${PROJ}" || { echo "No .xcodeproj in ${IOSOUT}"; exit 1; }
 log "Using generated project: ${PROJ}"
 
-TARGET="$(xcodebuild -list -project "${PROJ}" 2>/dev/null | awk '/Targets:/{f=1;next} /Build Configurations:/{f=0} f && NF{print $1; exit}')"
+TARGET="$(xcodebuild -list -project "${PROJ}" 2>/dev/null | awk '/Targets:/{f=1;next} /Build Configurations:/{f=0} f && NF{sub(/^[ \t]+/, ""); print; exit}')"
 test -n "${TARGET}" || { echo "No target found in ${PROJ}"; exit 1; }
 log "Build target: ${TARGET}"
 
@@ -177,7 +177,7 @@ log "Building unsigned IPA (reference renios project)..."
 rm -rf "${BUILD}/dd"
 xcodebuild \
   -project "${PROJ}" \
-  -target "${TARGET}" \
+  -scheme "${TARGET}" \
   -configuration Release \
   -destination 'generic/platform=iOS' \
   -derivedDataPath "${BUILD}/dd" \
